@@ -1,0 +1,45 @@
+body {
+  background: #f6f7fb;
+  color: #172033;
+}
+
+.navbar {
+  box-shadow: 0 1px 8px rgba(23, 32, 51, 0.04);
+}
+
+.lab-card,
+.side-panel,
+.auth-panel,
+.empty-panel {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.lab-card {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.lab-card:hover {
+  border-color: #4f6df5;
+  transform: translateY(-2px);
+}
+
+.content-block {
+  max-width: 68ch;
+}
+
+.json-panel {
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.auth-panel {
+  max-width: 420px;
+}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Session {{ session.id }} | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <nav class="mb-3">
+    <a href="{{ session.scenario.get_absolute_url }}" class="text-decoration-none">{{ session.scenario.title }}</a>
+  </nav>
+
+  <div class="row g-4">
+    <section class="col-lg-7">
+      <p class="text-uppercase text-secondary small mb-1">{{ session.simulation_type.name }}</p>
+      <h1 class="h2">Session {{ session.id }}</h1>
+      <p class="text-secondary">Status: {{ session.get_status_display }}</p>
+
+      <h2 class="h5 mt-4">Current State</h2>
+      <pre class="json-panel">{{ session.current_state|pprint }}</pre>
+    </section>
+
+    <aside class="col-lg-5">
+      <div class="side-panel">
+        <h2 class="h5">Session Details</h2>
+        <dl class="row mb-0">
+          <dt class="col-5">Scenario</dt>
+          <dd class="col-7">{{ session.scenario.title }}</dd>
+          <dt class="col-5">Role</dt>
+          <dd class="col-7">{{ session.selected_role|default:"None" }}</dd>
+          <dt class="col-5">Started</dt>
+          <dd class="col-7">{{ session.started_at }}</dd>
+        </dl>
+      </div>
+
+      <h2 class="h5 mt-4">Event History</h2>
+      <div class="list-group">
+        {% for event in session.events.all %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between">
+              <strong>{{ event.event_type }}</strong>
+              <span class="text-secondary small">#{{ event.sequence }}</span>
+            </div>
+            <p class="mb-1">{{ event.message }}</p>
+            <small class="text-secondary">{{ event.created_at }}</small>
+          </div>
+        {% empty %}
+          <div class="list-group-item text-secondary">No events recorded yet.</div>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}

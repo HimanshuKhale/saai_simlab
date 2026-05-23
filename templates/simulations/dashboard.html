@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Labs | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <div class="mb-4">
+    <p class="text-uppercase text-secondary small mb-1">Educational simulation platform</p>
+    <h1 class="h2 mb-2">Simulation Labs</h1>
+    <p class="text-secondary mb-0">Choose a lab to explore published scenarios.</p>
+  </div>
+
+  <div class="row g-3">
+    {% for simulation_type in simulation_types %}
+      <div class="col-md-6 col-xl-3">
+        <a class="lab-card d-block h-100" href="{{ simulation_type.get_absolute_url }}">
+          <div class="fs-3 mb-3">{{ simulation_type.icon|default:"Lab" }}</div>
+          <h2 class="h5">{{ simulation_type.name }}</h2>
+          <p class="text-secondary mb-0">{{ simulation_type.description }}</p>
+        </a>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="empty-panel">No published simulation types yet. Load seed data or publish items in admin.</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}

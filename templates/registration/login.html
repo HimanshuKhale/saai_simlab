@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Log in | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <div class="auth-panel mx-auto">
+    <h1 class="h3 mb-3">Log in</h1>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn btn-primary w-100" type="submit">Log in</button>
+    </form>
+  </div>
+{% endblock %}

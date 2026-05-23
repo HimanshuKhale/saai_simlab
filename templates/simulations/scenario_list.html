@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ simulation_type.name }} | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <nav class="mb-3">
+    <a href="{% url 'dashboard' %}" class="text-decoration-none">All labs</a>
+  </nav>
+  <div class="mb-4">
+    <p class="text-uppercase text-secondary small mb-1">{{ simulation_type.name }}</p>
+    <h1 class="h2 mb-2">Scenarios</h1>
+    <p class="text-secondary mb-0">{{ simulation_type.description }}</p>
+  </div>
+
+  <div class="list-group shadow-sm">
+    {% for scenario in scenarios %}
+      <a class="list-group-item list-group-item-action p-3" href="{{ scenario.get_absolute_url }}">
+        <div class="d-flex justify-content-between gap-3">
+          <div>
+            <h2 class="h5 mb-1">{{ scenario.title }}</h2>
+            <p class="text-secondary mb-0">{{ scenario.summary }}</p>
+          </div>
+          <span class="badge text-bg-light align-self-start">{{ scenario.estimated_minutes }} min</span>
+        </div>
+      </a>
+    {% empty %}
+      <div class="list-group-item p-3 text-secondary">No published scenarios in this lab yet.</div>
+    {% endfor %}
+  </div>
+{% endblock %}
