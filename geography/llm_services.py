@@ -217,6 +217,11 @@ def _response_text(client, *, instructions, payload):
 
 def feature_context(feature, include_external_data=True):
     project = feature.project
+    first_geo = {}
+    for point in (feature.geometry or {}).get('points') or []:
+        if isinstance(point, dict) and point.get('geo'):
+            first_geo = point['geo']
+            break
     notes = [
         {
             'type': note.note_type,
@@ -247,6 +252,13 @@ def feature_context(feature, include_external_data=True):
             'description': _truncate(project.description),
             'tags': project.tags,
             'calibration_status': 'calibrated' if project.calibration_json else 'not_calibrated',
+            'calibration_mode': (project.calibration_json or {}).get('mode'),
+            'calibration_warning': (project.calibration_json or {}).get('warning'),
+            'map_asset_title': project.map_asset.title if project.map_asset else 'Custom map',
+            'map_type': (project.map_asset.metadata or {}).get('map_kind') if project.map_asset else 'custom',
+            'board': project.map_asset.board if project.map_asset else '',
+            'grade': project.map_asset.grade_level if project.map_asset else '',
+            'subject': project.map_asset.subject if project.map_asset else '',
         },
         'feature': {
             'id': feature.id,
@@ -257,6 +269,10 @@ def feature_context(feature, include_external_data=True):
             'geometry': feature.geometry,
             'style': feature.style,
             'properties': feature.properties,
+            'latitude': first_geo.get('lat'),
+            'longitude': first_geo.get('lng'),
+            'coordinate_accuracy': first_geo.get('accuracy'),
+            'coordinate_warning': first_geo.get('warning'),
             'importance_note': _truncate(feature.importance_notes),
             'exam_note': _truncate(feature.exam_notes),
             'social_studies_connection': _truncate(feature.social_studies_notes),
@@ -265,6 +281,10 @@ def feature_context(feature, include_external_data=True):
         'notes': notes,
         'photo_captions': photos,
         'related_features': related,
+        'previous_ai_outputs': [
+            interaction.response_json
+            for interaction in feature.ai_interactions.all()[:3]
+        ],
         'external_public_data': {},
     }
     if include_external_data and getattr(settings, 'GEOGRAPHY_EXTERNAL_DATA_ENABLED', True):
@@ -296,8 +316,9 @@ def explain_selected_feature_with_llm(feature, project, include_external_data=Tr
     context = feature_context(feature, include_external_data=include_external_data)
     instructions = (
         f'{PROMPT_INJECTION_RULE}\n'
-        'You are a geography tutor for ICSE-style map work. Explain the selected feature using only the context as evidence, '
-        'and clearly separate physical, human, economic, and social studies points. Return JSON only.'
+        'You are a student-facing ICSE Class X Geography tutor. Explain the selected feature using the context as evidence. '
+        'Connect physical, human, political, and economic geography; include map marking relevance and exam-style questions. '
+        'Never claim approximate coordinates are exact. Return JSON only.'
     )
     schema = {
         'type': 'object',
@@ -307,10 +328,16 @@ def explain_selected_feature_with_llm(feature, project, include_external_data=Tr
             'summary': {'type': 'string'},
             'detailed_explanation': {'type': 'string'},
             'physical_geography': {'type': 'string'},
+            'political_geography': {'type': 'string'},
             'human_geography': {'type': 'string'},
             'economic_importance': {'type': 'string'},
+            'policy_or_governance_relevance': {'type': 'string'},
             'historical_or_civics_connection': {'type': 'string'},
+            'icse_exam_note': {'type': 'string'},
             'exam_note': {'type': 'string'},
+            'map_marking_relevance': {'type': 'string'},
+            'forces_or_attributes': {'type': 'array', 'items': {'type': 'string'}},
+            'possible_questions': {'type': 'array', 'items': {'type': 'object', 'additionalProperties': True}},
             'common_mistakes': {'type': 'array', 'items': {'type': 'string'}},
             'related_features_to_add': {'type': 'array', 'items': {'type': 'string'}},
             'questions': {'type': 'array', 'items': {'type': 'object', 'additionalProperties': True}},
@@ -325,11 +352,16 @@ def explain_selected_feature_with_llm(feature, project, include_external_data=Tr
     result = _response_json(client, instructions=instructions, payload=context)
     if result is None:
         return fallback
-    return _ensure_source_metadata(
+    result = _ensure_source_metadata(
         result,
         external=bool(context.get('external_public_data')),
         student_notes=bool(context['notes'] or context['feature']['exam_note']),
     )
+    if context['feature'].get('coordinate_accuracy') == 'approximate':
+        result.setdefault('warnings', []).append(
+            context['feature'].get('coordinate_warning') or 'Approximate coordinate for learning use.'
+        )
+    return result
 
 
 def generate_feature_json_with_llm(project, user_request, feature_type, feature_name, description):

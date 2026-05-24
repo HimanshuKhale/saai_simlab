@@ -20,6 +20,16 @@
   gap: 0.5rem;
 }
 
+.calibration-banner {
+  background: #fff8e1;
+  border: 1px solid #f1d37a;
+  border-radius: 8px;
+  color: #5f4b13;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.9rem;
+}
+
 .map-workspace {
   display: grid;
   gap: 1rem;
@@ -108,6 +118,16 @@
   filter: drop-shadow(0 0 5px rgba(37, 78, 219, 0.75));
 }
 
+.map-overlay .pulse {
+  animation: markerPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes markerPulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
 .map-loupe {
   background: rgba(255, 255, 255, 0.88);
   border: 2px solid #254edb;
@@ -145,6 +165,28 @@
 
 .feature-list button.active {
   border-color: #254edb;
+}
+
+.coordinate-panel,
+.style-panel {
+  background: #f7f8fb;
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+  color: #344054;
+  font-size: 0.82rem;
+  padding: 0.6rem;
+}
+
+.style-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.form-control-color {
+  height: 2rem;
+  padding: 0.15rem;
+  width: 100%;
 }
 
 .ai-output {

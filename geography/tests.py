@@ -4,15 +4,22 @@ import tempfile
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from . import external_data, llm_services
+from .defaults import (
+    CALIBRATION_DEFAULT_INDIA_APPROX,
+    CALIBRATION_UNCALIBRATED,
+    DEFAULT_INDIA_MAP_SLUG,
+)
 from .models import (
     GeographyChatMessage,
     GeographyChatSession,
     GeographyStudyNote,
+    MapAsset,
     MapFeature,
     MapFeatureNote,
     MapFeaturePhoto,
@@ -34,13 +41,48 @@ class GeographyMapLabTests(TestCase):
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username='student', password='pass12345')
         self.other_user = user_model.objects.create_user(username='other', password='pass12345')
-        self.project = MapProject.objects.create(owner=self.user, title='India practice')
+        self.default_asset = MapAsset.objects.create(
+            title='India Political Map 2026',
+            slug=DEFAULT_INDIA_MAP_SLUG,
+            description='Political Map of India for ICSE Class X Geography Map Lab.',
+            asset_type=MapAsset.AssetType.PRACTICE,
+            region='India',
+            grade_level='Class X',
+            subject='Geography',
+            board='ICSE',
+            metadata={'default': True, 'calibration_mode': CALIBRATION_DEFAULT_INDIA_APPROX},
+            default_project_json={'calibration_mode': CALIBRATION_DEFAULT_INDIA_APPROX, 'features': []},
+            default_calibration_json={'mode': CALIBRATION_DEFAULT_INDIA_APPROX, 'warning': 'Approximate'},
+            published=True,
+        )
+        self.project = MapProject.objects.create(
+            owner=self.user,
+            title='India practice',
+            map_asset=self.default_asset,
+            calibration_json={'mode': CALIBRATION_DEFAULT_INDIA_APPROX, 'warning': 'Approximate'},
+        )
         self.feature = MapFeature.objects.create(
             project=self.project,
             name='Narmada River',
             feature_type=MapFeature.FeatureType.LINE,
             category='river',
-            geometry={'points': [{'x': 10, 'y': 20}, {'x': 30, 'y': 40}]},
+            geometry={
+                'points': [
+                    {
+                        'x': 10,
+                        'y': 20,
+                        'geo': {
+                            'lat': 31.345946,
+                            'lng': 70.413158,
+                            'accuracy': 'approximate',
+                            'calibration_mode': CALIBRATION_DEFAULT_INDIA_APPROX,
+                            'warning': 'Approximate coordinate for learning use.',
+                        },
+                        'grid': None,
+                    },
+                    {'x': 30, 'y': 40},
+                ]
+            },
             exam_notes='West flowing river.',
         )
 
@@ -59,6 +101,47 @@ class GeographyMapLabTests(TestCase):
         project = MapProject.objects.get(title='Custom project')
         self.assertEqual(project.owner, self.user)
         self.assertRedirects(response, reverse('geography:workspace', kwargs={'project_id': project.id}))
+
+    def test_seed_geography_defaults_creates_india_political_map_asset(self):
+        MapAsset.objects.filter(slug=DEFAULT_INDIA_MAP_SLUG).delete()
+        call_command('seed_geography_defaults')
+        asset = MapAsset.objects.get(slug=DEFAULT_INDIA_MAP_SLUG)
+        self.assertEqual(asset.title, 'India Political Map 2026')
+        self.assertEqual(asset.metadata['calibration_mode'], CALIBRATION_DEFAULT_INDIA_APPROX)
+        self.assertTrue(asset.published)
+
+    def test_create_project_without_map_uses_default_india_map(self):
+        self.login()
+        response = self.client.post(
+            reverse('geography:project_create'),
+            {
+                'title': 'Default map project',
+                'description': '',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        project = MapProject.objects.get(title='Default map project')
+        self.assertEqual(project.map_asset.slug, DEFAULT_INDIA_MAP_SLUG)
+        self.assertEqual(project.calibration_json['mode'], CALIBRATION_DEFAULT_INDIA_APPROX)
+
+    def test_custom_uploaded_map_starts_uncalibrated(self):
+        self.login()
+        image = SimpleUploadedFile(
+            'custom.gif',
+            b'GIF87a\x01\x00\x01\x00\x80\x01\x00\x00\x00\x00\xff\xff\xff,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;',
+            content_type='image/gif',
+        )
+        response = self.client.post(
+            reverse('geography:project_create'),
+            {
+                'title': 'Custom map',
+                'description': '',
+                'custom_map_image': image,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        project = MapProject.objects.get(title='Custom map')
+        self.assertEqual(project.calibration_json['mode'], CALIBRATION_UNCALIBRATED)
 
     def test_unauthenticated_user_is_redirected_from_project_pages(self):
         urls = [
@@ -98,6 +181,59 @@ class GeographyMapLabTests(TestCase):
         self.project.refresh_from_db()
         self.assertEqual(self.project.project_json, payload['project_json'])
         self.assertEqual(self.project.calibration_json, payload['calibration_json'])
+
+    def test_project_json_can_store_approximate_geo_and_style(self):
+        self.login()
+        payload = {
+            'project_json': {
+                'schema': 'saai.geography.project.v1',
+                'calibration_mode': CALIBRATION_DEFAULT_INDIA_APPROX,
+                'features': [
+                    {
+                        'name': 'Delhi',
+                        'feature_type': 'point',
+                        'geometry': {
+                            'points': [
+                                {
+                                    'x': 31,
+                                    'y': 33,
+                                    'geo': {
+                                        'lat': 28.6139,
+                                        'lng': 77.209,
+                                        'accuracy': 'approximate',
+                                        'warning': 'Approximate coordinate for learning use.',
+                                    },
+                                    'grid': None,
+                                }
+                            ]
+                        },
+                        'style': {
+                            'point': {
+                                'radius': 1.3,
+                                'fillColor': '#dc2626',
+                                'borderColor': '#ffffff',
+                                'borderWidth': 0.5,
+                            },
+                            'label': {
+                                'fontSize': 3,
+                                'fontColor': '#111827',
+                            },
+                        },
+                    }
+                ],
+            }
+        }
+        response = self.client.post(
+            reverse('geography:api_project_save', kwargs={'project_id': self.project.id}),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.project.refresh_from_db()
+        feature = self.project.project_json['features'][0]
+        self.assertEqual(feature['geometry']['points'][0]['geo']['accuracy'], 'approximate')
+        self.assertEqual(feature['style']['point']['radius'], 1.3)
+        self.assertEqual(feature['style']['label']['fontColor'], '#111827')
 
     def test_feature_create_update_delete_works_for_owner(self):
         self.login()
@@ -181,6 +317,9 @@ class GeographyMapLabTests(TestCase):
         self.assertEqual(explain_response.status_code, 200)
         self.assertIn('explanation', explain_response.json())
         self.assertIn('source_basis', explain_response.json()['explanation'])
+        self.assertIn('icse_exam_note', explain_response.json()['explanation'])
+        self.assertIn('map_marking_relevance', explain_response.json()['explanation'])
+        self.assertTrue(explain_response.json()['explanation']['warnings'])
         self.assertEqual(questions_response.status_code, 200)
         self.assertIn('questions', questions_response.json())
         self.assertEqual(check_response.status_code, 200)
@@ -214,6 +353,27 @@ class GeographyMapLabTests(TestCase):
         self.client.login(username='other', password='pass12345')
         response = self.client.post(
             reverse('geography:api_ai_explain_feature', kwargs={'feature_id': self.feature.id}),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_feature_report_pdf_returns_pdf(self):
+        self.login()
+        MapFeatureNote.objects.create(
+            feature=self.feature,
+            author=self.user,
+            note_type='importance',
+            body='Important for river systems.',
+        )
+        response = self.client.get(
+            reverse('geography:api_feature_report_pdf', kwargs={'feature_id': self.feature.id}),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_non_owner_cannot_download_feature_report_pdf(self):
+        self.client.login(username='other', password='pass12345')
+        response = self.client.get(
+            reverse('geography:api_feature_report_pdf', kwargs={'feature_id': self.feature.id}),
         )
         self.assertEqual(response.status_code, 404)
 

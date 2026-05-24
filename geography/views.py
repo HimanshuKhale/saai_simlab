@@ -10,7 +10,20 @@ from django.urls import reverse
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
-from . import ai_services, external_data, llm_services
+from . import ai_services, external_data, llm_services, pdf_services
+from .defaults import (
+    CALIBRATION_DEFAULT_INDIA_APPROX,
+    CALIBRATION_UNCALIBRATED,
+    DEFAULT_INDIA_MAP_BOUNDS,
+    DEFAULT_INDIA_MAP_SLUG,
+    DEFAULT_INDIA_CALIBRATION_WARNING,
+    UNCALIBRATED_WARNING,
+    calibration_warning_for,
+    default_india_calibration_json,
+    default_india_project_json,
+    uncalibrated_calibration_json,
+    uncalibrated_project_json,
+)
 from .forms import MapProjectForm
 from .models import (
     GeographyAIInteraction,
@@ -65,6 +78,26 @@ def _bad_json(message, status=400):
     return JsonResponse({'ok': False, 'error': message}, status=status)
 
 
+def _default_india_asset():
+    return MapAsset.objects.filter(slug=DEFAULT_INDIA_MAP_SLUG, published=True).first()
+
+
+def _calibration_mode(project):
+    return (project.calibration_json or {}).get('mode') or (project.project_json or {}).get('calibration_mode') or CALIBRATION_UNCALIBRATED
+
+
+def _apply_initial_project_defaults(project):
+    if project.map_asset and project.map_asset.slug == DEFAULT_INDIA_MAP_SLUG:
+        project.project_json = project.map_asset.default_project_json or default_india_project_json()
+        project.calibration_json = project.map_asset.default_calibration_json or default_india_calibration_json()
+    elif project.map_asset:
+        project.project_json = project.map_asset.default_project_json or uncalibrated_project_json()
+        project.calibration_json = project.map_asset.default_calibration_json or uncalibrated_calibration_json()
+    else:
+        project.project_json = uncalibrated_project_json()
+        project.calibration_json = uncalibrated_calibration_json()
+
+
 def _feature_payload(feature):
     return {
         'id': feature.id,
@@ -87,6 +120,7 @@ def _feature_payload(feature):
                 'id': photo.id,
                 'url': photo.image.url,
                 'caption': photo.caption,
+                'source': photo.source,
                 'created_at': photo.created_at.isoformat(),
             }
             for photo in feature.photos.all()
@@ -100,6 +134,15 @@ def _feature_payload(feature):
                 'created_at': note.created_at.isoformat(),
             }
             for note in feature.notes.all()
+        ],
+        'ai_outputs': [
+            {
+                'id': interaction.id,
+                'action': interaction.action,
+                'response_json': interaction.response_json,
+                'created_at': interaction.created_at.isoformat(),
+            }
+            for interaction in feature.ai_interactions.all()[:5]
         ],
         'created_at': feature.created_at.isoformat(),
         'updated_at': feature.updated_at.isoformat(),
@@ -134,12 +177,14 @@ def _set_feature_fields(feature, payload):
 def dashboard(request):
     recent_projects = MapProject.objects.filter(owner=request.user).select_related('map_asset')[:5]
     map_assets = MapAsset.objects.filter(published=True).order_by('title')[:6]
+    default_asset = _default_india_asset()
     return render(
         request,
         'geography/map_dashboard.html',
         {
             'recent_projects': recent_projects,
             'map_assets': map_assets,
+            'default_asset': default_asset,
         },
     )
 
@@ -155,6 +200,9 @@ def project_create(request):
     initial = {}
     asset_id = request.GET.get('asset')
     task_id = request.GET.get('task')
+    default_asset = _default_india_asset()
+    if request.GET.get('default') == 'india' and default_asset:
+        initial['map_asset'] = default_asset.id
     if asset_id:
         initial['map_asset'] = asset_id
     if task_id:
@@ -169,26 +217,54 @@ def project_create(request):
         if form.is_valid():
             project = form.save(commit=False)
             project.owner = request.user
-            if project.map_asset:
-                project.project_json = project.map_asset.default_project_json or {}
-                project.calibration_json = project.map_asset.default_calibration_json or {}
+            if not project.map_asset and not project.custom_map_image:
+                project.map_asset = default_asset
+            _apply_initial_project_defaults(project)
             project.save()
             messages.success(request, 'Map project created.')
             return redirect('geography:workspace', project_id=project.id)
     else:
         form = MapProjectForm(user=request.user, initial=initial)
-    return render(request, 'geography/map_project_create.html', {'form': form})
+    return render(request, 'geography/map_project_create.html', {'form': form, 'default_asset': default_asset})
+
+
+@login_required
+@require_POST
+def start_default_project(request):
+    default_asset = _default_india_asset()
+    project = MapProject(
+        owner=request.user,
+        title='India Political Map 2026',
+        description='ICSE Class X Geography default India Political Map workspace.',
+        map_asset=default_asset,
+    )
+    _apply_initial_project_defaults(project)
+    project.save()
+    messages.success(request, 'India Political Map project ready.')
+    return redirect('geography:workspace', project_id=project.id)
 
 
 @login_required
 def workspace(request, project_id):
     project = _owner_project(request, project_id)
+    calibration_mode = _calibration_mode(project)
     map_config = {
         'projectId': project.id,
         'projectTitle': project.title,
         'mapImageUrl': project.map_image_url,
         'initialProjectJson': project.project_json,
         'calibrationJson': project.calibration_json,
+        'calibrationMode': calibration_mode,
+        'calibrationWarning': calibration_warning_for(calibration_mode),
+        'defaultIndiaBounds': DEFAULT_INDIA_MAP_BOUNDS,
+        'isDefaultIndiaMap': bool(project.map_asset and project.map_asset.slug == DEFAULT_INDIA_MAP_SLUG),
+        'mapMetadata': {
+            'mapAssetTitle': project.map_asset.title if project.map_asset else '',
+            'board': project.map_asset.board if project.map_asset else '',
+            'grade': project.map_asset.grade_level if project.map_asset else '',
+            'subject': project.map_asset.subject if project.map_asset else '',
+            'region': project.map_asset.region if project.map_asset else '',
+        },
         'csrfToken': get_token(request),
         'apiUrls': {
             'saveProject': reverse('geography:api_project_save', kwargs={'project_id': project.id}),
@@ -214,6 +290,7 @@ def workspace(request, project_id):
                 'geography:api_generate_feature_json',
                 kwargs={'project_id': project.id},
             ),
+            'featureReportTemplate': reverse('geography:api_feature_report_pdf', kwargs={'feature_id': 0}),
         },
     }
     return render(request, 'geography/map_workspace.html', {'project': project, 'map_config': map_config})
@@ -254,7 +331,7 @@ def save_project_json(request, project_id):
 def features(request, project_id):
     project = _owner_project(request, project_id)
     if request.method == 'GET':
-        queryset = project.features.prefetch_related('photos', 'notes')
+        queryset = project.features.prefetch_related('photos', 'notes', 'ai_interactions')
         return JsonResponse({'features': [_feature_payload(feature) for feature in queryset]})
 
     payload = _json_body(request)
@@ -298,6 +375,7 @@ def feature_photo_upload(request, feature_id):
         uploaded_by=request.user,
         image=image,
         caption=request.POST.get('caption', ''),
+        source=request.POST.get('source', ''),
     )
     return JsonResponse(
         {
@@ -306,6 +384,7 @@ def feature_photo_upload(request, feature_id):
                 'id': photo.id,
                 'url': photo.image.url,
                 'caption': photo.caption,
+                'source': photo.source,
                 'created_at': photo.created_at.isoformat(),
             },
         },
@@ -330,6 +409,16 @@ def feature_note_add(request, feature_id):
         body=body,
         tags=payload.get('tags') or [],
     )
+    field_map = {
+        MapFeatureNote.NoteType.IMPORTANCE: 'importance_notes',
+        MapFeatureNote.NoteType.EXAM: 'exam_notes',
+        MapFeatureNote.NoteType.SOCIAL_STUDIES: 'social_studies_notes',
+    }
+    mapped_field = field_map.get(note.note_type)
+    if mapped_field:
+        existing = getattr(feature, mapped_field)
+        setattr(feature, mapped_field, f'{existing}\n{body}'.strip() if existing else body)
+        feature.save(update_fields=[mapped_field, 'updated_at'])
     return JsonResponse(
         {
             'ok': True,
@@ -637,3 +726,14 @@ def chat_study_notes(request, chat_id):
         },
         status=201,
     )
+
+
+@login_required
+@require_http_methods(['GET'])
+def feature_report_pdf(request, feature_id):
+    feature = _owner_feature(request, feature_id)
+    pdf_bytes = pdf_services.build_feature_report_pdf(feature)
+    filename = f'geography_feature_{feature.id}_{slugify(feature.name) or "report"}.pdf'
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

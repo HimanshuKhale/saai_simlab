@@ -21,7 +21,10 @@ class MapAsset(models.Model):
         choices=AssetType.choices,
         default=AssetType.PRACTICE,
     )
+    region = models.CharField(max_length=120, blank=True)
     grade_level = models.CharField(max_length=60, blank=True)
+    subject = models.CharField(max_length=120, blank=True)
+    board = models.CharField(max_length=120, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
     default_project_json = models.JSONField(default=dict, blank=True)
     default_calibration_json = models.JSONField(default=dict, blank=True)
@@ -171,6 +174,7 @@ class MapFeaturePhoto(models.Model):
     )
     image = models.ImageField(upload_to='geography/feature_photos/')
     caption = models.CharField(max_length=255, blank=True)
+    source = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

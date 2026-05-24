@@ -17,10 +17,10 @@ from .models import (
 
 @admin.register(MapAsset)
 class MapAssetAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'asset_type', 'grade_level', 'has_asset_file', 'published', 'updated_at')
-    list_filter = ('published', 'asset_type', 'grade_level')
+    list_display = ('title', 'slug', 'asset_type', 'region', 'grade_level', 'board', 'has_asset_file', 'published', 'updated_at')
+    list_filter = ('published', 'asset_type', 'region', 'grade_level', 'board')
     prepopulated_fields = {'slug': ('title',)}
-    search_fields = ('title', 'description')
+    search_fields = ('title', 'description', 'region', 'subject', 'board')
 
     @admin.display(boolean=True, description='Asset file')
     def has_asset_file(self, obj):
@@ -60,9 +60,9 @@ class MapFeatureAdmin(admin.ModelAdmin):
 
 @admin.register(MapFeaturePhoto)
 class MapFeaturePhotoAdmin(admin.ModelAdmin):
-    list_display = ('feature', 'uploaded_by', 'caption', 'created_at')
+    list_display = ('feature', 'uploaded_by', 'caption', 'source', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('feature__name', 'caption', 'uploaded_by__username')
+    search_fields = ('feature__name', 'caption', 'source', 'uploaded_by__username')
 
 
 @admin.register(MapFeatureNote)

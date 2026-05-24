@@ -11,6 +11,11 @@
     <section class="col-lg-8">
       <div class="side-panel">
         <h1 class="h3 mb-3">Create map project</h1>
+        {% if default_asset %}
+          <div class="alert alert-info">
+            India Political Map 2026 is preselected by default. Custom uploaded maps start in annotation-only, uncalibrated mode.
+          </div>
+        {% endif %}
         <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
           {{ form.non_field_errors }}

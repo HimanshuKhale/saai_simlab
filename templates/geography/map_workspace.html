@@ -26,6 +26,8 @@
       </div>
     </header>
 
+    <div class="calibration-banner" id="calibration-banner">{{ map_config.calibrationWarning }}</div>
+
     <div class="map-workspace">
       <aside class="map-sidebar">
         <div class="tool-grid" aria-label="Map tools">
@@ -97,6 +99,76 @@
           <input class="form-control form-control-sm mb-2" id="feature-category">
           <label class="form-label" for="feature-force">ICSE force</label>
           <input class="form-control form-control-sm mb-2" id="feature-force">
+          <label class="form-label" for="feature-tags">Tags</label>
+          <input class="form-control form-control-sm mb-2" id="feature-tags" placeholder="comma,separated,tags">
+          <div class="coordinate-panel mb-2" id="selected-coordinate-panel">No coordinate selected.</div>
+
+          <details class="style-panel mb-2" open>
+            <summary>Marker and label style</summary>
+            <label class="form-label" for="marker-shape">Marker shape</label>
+            <select class="form-select form-select-sm mb-2 style-control" id="marker-shape">
+              <option value="circle">Circle</option>
+              <option value="square">Square</option>
+              <option value="triangle">Triangle</option>
+            </select>
+            <label class="form-label" for="marker-radius">Marker size</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="marker-radius" type="number" step="0.1" min="0.4" max="8">
+            <label class="form-label" for="marker-fill">Fill color</label>
+            <input class="form-control form-control-color mb-2 style-control" id="marker-fill" type="color">
+            <label class="form-label" for="marker-border">Border color</label>
+            <input class="form-control form-control-color mb-2 style-control" id="marker-border" type="color">
+            <label class="form-label" for="marker-border-width">Border width</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="marker-border-width" type="number" step="0.1" min="0" max="5">
+            <label class="form-label" for="marker-opacity">Opacity</label>
+            <input class="form-range style-control" id="marker-opacity" type="range" step="0.05" min="0.1" max="1">
+            <label class="form-check mb-2">
+              <input class="form-check-input style-control" id="marker-pulse" type="checkbox">
+              <span class="form-check-label">Pulse</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input style-control" id="label-show" type="checkbox">
+              <span class="form-check-label">Show label</span>
+            </label>
+            <label class="form-label" for="label-text">Label text</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="label-text">
+            <label class="form-label" for="label-font-family">Font family</label>
+            <select class="form-select form-select-sm mb-2 style-control" id="label-font-family">
+              <option value="Inter">Inter</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Times New Roman">Times New Roman</option>
+            </select>
+            <label class="form-label" for="label-font-style">Font style</label>
+            <select class="form-select form-select-sm mb-2 style-control" id="label-font-style">
+              <option value="normal">Normal</option>
+              <option value="bold">Bold</option>
+              <option value="italic">Italic</option>
+              <option value="bold italic">Bold italic</option>
+            </select>
+            <label class="form-label" for="label-font-size">Font size</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="label-font-size" type="number" step="0.2" min="1" max="12">
+            <label class="form-label" for="label-font-color">Font color</label>
+            <input class="form-control form-control-color mb-2 style-control" id="label-font-color" type="color">
+            <label class="form-label" for="label-stroke-color">Outline color</label>
+            <input class="form-control form-control-color mb-2 style-control" id="label-stroke-color" type="color">
+            <label class="form-label" for="label-stroke-width">Outline width</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="label-stroke-width" type="number" step="0.1" min="0" max="5">
+            <label class="form-check mb-2">
+              <input class="form-check-input style-control" id="label-uppercase" type="checkbox">
+              <span class="form-check-label">Uppercase</span>
+            </label>
+            <label class="form-label" for="label-offset-x">Offset X</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="label-offset-x" type="number" step="0.1" min="-20" max="20">
+            <label class="form-label" for="label-offset-y">Offset Y</label>
+            <input class="form-control form-control-sm mb-2 style-control" id="label-offset-y" type="number" step="0.1" min="-20" max="20">
+            <label class="form-label" for="label-align">Alignment</label>
+            <select class="form-select form-select-sm mb-2 style-control" id="label-align">
+              <option value="start">Start</option>
+              <option value="middle">Middle</option>
+              <option value="end">End</option>
+            </select>
+          </details>
+
           <label class="form-label" for="feature-importance">Importance notes</label>
           <textarea class="form-control form-control-sm mb-2" id="feature-importance" rows="2"></textarea>
           <label class="form-label" for="feature-exam">Exam notes</label>
@@ -106,6 +178,7 @@
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-primary" type="submit">Update</button>
             <button class="btn btn-sm btn-outline-danger" type="button" data-map-action="delete-feature">Delete</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-map-action="report-pdf">PDF</button>
           </div>
         </form>
 
@@ -114,6 +187,7 @@
         <form id="photo-form" class="mb-2">
           <input class="form-control form-control-sm mb-2" type="file" id="photo-image" accept="image/*">
           <input class="form-control form-control-sm mb-2" id="photo-caption" placeholder="Caption">
+          <input class="form-control form-control-sm mb-2" id="photo-source" placeholder="Source">
           <button class="btn btn-sm btn-outline-primary" type="submit">Upload photo</button>
         </form>
         <form id="note-form">

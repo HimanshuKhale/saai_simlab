@@ -101,5 +101,8 @@
     chatExportUrl(id) {
       return apiUrl(window.SAAI_MAP_CONFIG.apiUrls.chatExportTemplate, id);
     },
+    featureReportUrl(id) {
+      return apiUrl(window.SAAI_MAP_CONFIG.apiUrls.featureReportTemplate, id);
+    },
   };
 })();

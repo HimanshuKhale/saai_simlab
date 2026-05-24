@@ -6,3 +6,4 @@ tzdata==2026.2
 openai
 python-dotenv
 requests
+reportlab

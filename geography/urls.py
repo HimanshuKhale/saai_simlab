@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('projects/', views.project_list, name='project_list'),
     path('projects/create/', views.project_create, name='project_create'),
+    path('projects/start-default/', views.start_default_project, name='start_default_project'),
     path('projects/<int:project_id>/', views.project_detail, name='project_detail'),
     path('projects/<int:project_id>/workspace/', views.workspace, name='workspace'),
     path('api/projects/<int:project_id>/save/', views.save_project_json, name='api_project_save'),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('api/features/<int:feature_id>/delete/', views.feature_delete, name='api_feature_delete'),
     path('api/features/<int:feature_id>/photos/', views.feature_photo_upload, name='api_feature_photo_upload'),
     path('api/features/<int:feature_id>/notes/', views.feature_note_add, name='api_feature_note_add'),
+    path('api/features/<int:feature_id>/report-pdf/', views.feature_report_pdf, name='api_feature_report_pdf'),
     path('api/features/<int:feature_id>/ai/explain/', views.ai_explain_feature, name='api_ai_explain_feature'),
     path(
         'api/features/<int:feature_id>/ai/questions/',

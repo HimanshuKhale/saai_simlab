@@ -9,8 +9,20 @@
       <h1 class="h2 mb-2">Map projects</h1>
       <p class="text-secondary mb-0">Create, resume, and review saved map marking work.</p>
     </div>
-    <a class="btn btn-primary" href="{% url 'geography:project_create' %}">Create project</a>
+    <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="{% url 'geography:start_default_project' %}">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">Start with India Political Map</button>
+      </form>
+      <a class="btn btn-outline-secondary" href="{% url 'geography:project_create' %}">Create project</a>
+    </div>
   </div>
+
+  {% if default_asset and not default_asset.asset_file %}
+    <div class="alert alert-warning">
+      Default India Political Map asset is configured, but POLMAP_ENGLISH-2026_page-0001.jpg is not attached yet.
+    </div>
+  {% endif %}
 
   <div class="row g-4">
     <section class="col-lg-7">

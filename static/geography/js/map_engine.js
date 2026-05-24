@@ -2,6 +2,56 @@
   const svgNS = 'http://www.w3.org/2000/svg';
   const config = window.SAAI_MAP_CONFIG;
   const api = window.SAAIMapAPI;
+  const DEFAULT_INDIA_MAP_BOUNDS = config.defaultIndiaBounds || {
+    minLng: 68.1,
+    maxLng: 97.4,
+    minLat: 6.7,
+    maxLat: 37.1,
+    imageContentBox: {
+      xMin: 2.5,
+      xMax: 97.5,
+      yMin: 2.5,
+      yMax: 95.0,
+    },
+  };
+  const DEFAULT_STYLE = {
+    point: {
+      shape: 'circle',
+      radius: 1.3,
+      fillColor: '#dc2626',
+      borderColor: '#ffffff',
+      borderWidth: 0.5,
+      opacity: 1,
+      pulse: false,
+    },
+    label: {
+      show: true,
+      text: '',
+      fontFamily: 'Inter',
+      fontStyle: 'bold',
+      fontSize: 3,
+      fontColor: '#111827',
+      strokeColor: '#ffffff',
+      strokeWidth: 1,
+      uppercase: true,
+      offsetX: 1.2,
+      offsetY: 0.4,
+      textAlign: 'start',
+    },
+    line: {
+      strokeColor: '#0ea5e9',
+      strokeWidth: 1.5,
+      strokeStyle: 'solid',
+      opacity: 1,
+    },
+    polygon: {
+      fillColor: '#16a34a',
+      fillOpacity: 0.28,
+      borderColor: '#166534',
+      borderWidth: 1.2,
+      borderStyle: 'solid',
+    },
+  };
   const state = {
     tool: 'select',
     features: [],
@@ -17,6 +67,7 @@
 
   const elements = {};
   let saveTimer = null;
+  let styleSaveTimer = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -24,10 +75,44 @@
 
   function stagePoint(event) {
     const rect = elements.overlay.getBoundingClientRect();
-    return {
+    const point = {
       x: Math.round(((event.clientX - rect.left) / rect.width) * 10000) / 100,
       y: Math.round(((event.clientY - rect.top) / rect.height) * 10000) / 100,
     };
+    return addGeoToPoint(point);
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function approximateIndiaGeo(point) {
+    const box = DEFAULT_INDIA_MAP_BOUNDS.imageContentBox;
+    const xRatio = (point.x - box.xMin) / (box.xMax - box.xMin);
+    const yRatio = (point.y - box.yMin) / (box.yMax - box.yMin);
+    const outside = point.x < box.xMin || point.x > box.xMax || point.y < box.yMin || point.y > box.yMax;
+    const lng = DEFAULT_INDIA_MAP_BOUNDS.minLng + clamp(xRatio, 0, 1) * (DEFAULT_INDIA_MAP_BOUNDS.maxLng - DEFAULT_INDIA_MAP_BOUNDS.minLng);
+    const lat = DEFAULT_INDIA_MAP_BOUNDS.maxLat - clamp(yRatio, 0, 1) * (DEFAULT_INDIA_MAP_BOUNDS.maxLat - DEFAULT_INDIA_MAP_BOUNDS.minLat);
+    return {
+      lat: Math.round(lat * 1000000) / 1000000,
+      lng: Math.round(lng * 1000000) / 1000000,
+      accuracy: 'approximate',
+      calibration_mode: 'default_india_approx',
+      warning: outside
+        ? 'Point is outside main calibrated map content area; coordinate may be unreliable.'
+        : 'Approximate coordinate for learning use.',
+    };
+  }
+
+  function addGeoToPoint(point) {
+    if (config.calibrationMode === 'default_india_approx') {
+      return {
+        ...point,
+        geo: approximateIndiaGeo(point),
+        grid: null,
+      };
+    }
+    return point;
   }
 
   function distance(a, b) {
@@ -38,7 +123,15 @@
 
   function featureProjectJson() {
     return {
+      schema: 'saai.geography.project.v1',
       version: 1,
+      project_metadata: {
+        id: config.projectId,
+        title: config.projectTitle,
+      },
+      map_metadata: config.mapMetadata || {},
+      calibration_mode: config.calibrationMode || 'uncalibrated',
+      calibration_warning: config.calibrationWarning || '',
       features: state.features.map((feature) => ({
         id: feature.id,
         name: feature.name,
@@ -48,6 +141,9 @@
         geometry: feature.geometry,
         style: feature.style,
         properties: feature.properties,
+        notes: feature.notes || [],
+        photos: feature.photos || [],
+        ai_outputs: feature.ai_outputs || [],
         tags: feature.tags,
       })),
       filters: {
@@ -85,6 +181,66 @@
     return state.features.find((feature) => feature.id === state.selectedId) || null;
   }
 
+  function normalizeStyle(style) {
+    const source = style || {};
+    const merged = JSON.parse(JSON.stringify(DEFAULT_STYLE));
+    if (source.point) Object.assign(merged.point, source.point);
+    if (source.label) Object.assign(merged.label, source.label);
+    if (source.line) Object.assign(merged.line, source.line);
+    if (source.polygon) Object.assign(merged.polygon, source.polygon);
+    if (source.color) {
+      merged.point.fillColor = source.color;
+      merged.line.strokeColor = source.color;
+      merged.polygon.borderColor = source.color;
+    }
+    if (source.radius) merged.point.radius = Number(source.radius);
+    if (source.strokeWidth) {
+      merged.point.borderWidth = Number(source.strokeWidth);
+      merged.line.strokeWidth = Number(source.strokeWidth);
+    }
+    if (source.fillOpacity) merged.polygon.fillOpacity = Number(source.fillOpacity);
+    if (source.labelSize) merged.label.fontSize = Number(source.labelSize);
+    if (source.labelColor) merged.label.fontColor = source.labelColor;
+    return merged;
+  }
+
+  function styleFromControls() {
+    return {
+      point: {
+        shape: $('marker-shape').value,
+        radius: Number($('marker-radius').value || 1.3),
+        fillColor: $('marker-fill').value || '#dc2626',
+        borderColor: $('marker-border').value || '#ffffff',
+        borderWidth: Number($('marker-border-width').value || 0.5),
+        opacity: Number($('marker-opacity').value || 1),
+        pulse: $('marker-pulse').checked,
+      },
+      label: {
+        show: $('label-show').checked,
+        text: $('label-text').value,
+        fontFamily: $('label-font-family').value || 'Inter',
+        fontStyle: $('label-font-style').value || 'bold',
+        fontSize: Number($('label-font-size').value || 3),
+        fontColor: $('label-font-color').value || '#111827',
+        strokeColor: $('label-stroke-color').value || '#ffffff',
+        strokeWidth: Number($('label-stroke-width').value || 1),
+        uppercase: $('label-uppercase').checked,
+        offsetX: Number($('label-offset-x').value || 1.2),
+        offsetY: Number($('label-offset-y').value || 0.4),
+        textAlign: $('label-align').value || 'start',
+      },
+      line: {
+        ...DEFAULT_STYLE.line,
+        strokeColor: $('marker-fill').value || DEFAULT_STYLE.line.strokeColor,
+        opacity: Number($('marker-opacity').value || 1),
+      },
+      polygon: {
+        ...DEFAULT_STYLE.polygon,
+        fillColor: $('marker-fill').value || DEFAULT_STYLE.polygon.fillColor,
+      },
+    };
+  }
+
   function setSelected(featureId) {
     if (state.selectedId !== featureId) {
       state.currentChatId = null;
@@ -96,9 +252,10 @@
   }
 
   function featureColor(feature) {
-    if (feature.style && feature.style.color) return feature.style.color;
-    if (feature.feature_type === 'polygon') return '#2f9e44';
-    if (feature.feature_type === 'line' || feature.feature_type === 'measure') return '#c92a2a';
+    const style = normalizeStyle(feature.style);
+    if (feature.feature_type === 'point' || feature.feature_type === 'label') return style.point.fillColor;
+    if (feature.feature_type === 'polygon') return style.polygon.borderColor;
+    if (feature.feature_type === 'line' || feature.feature_type === 'measure') return style.line.strokeColor;
     return '#254edb';
   }
 
@@ -110,51 +267,98 @@
 
   function renderFeature(feature) {
     const points = (feature.geometry && feature.geometry.points) || [];
+    const style = normalizeStyle(feature.style);
     const color = featureColor(feature);
+    const group = makeSvgElement('g', {});
+    group.classList.add('feature');
+    if (feature.id === state.selectedId) group.classList.add('selected');
+    group.dataset.featureId = feature.id;
+    group.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setSelected(feature.id);
+    });
     let node;
     if (feature.feature_type === 'point') {
       const point = points[0] || { x: 50, y: 50 };
-      node = makeSvgElement('circle', {
-        cx: point.x,
-        cy: point.y,
-        r: 6,
-        fill: color,
-        stroke: '#ffffff',
-        'stroke-width': 2,
-      });
+      if (style.point.shape === 'square') {
+        node = makeSvgElement('rect', {
+          x: point.x - style.point.radius,
+          y: point.y - style.point.radius,
+          width: style.point.radius * 2,
+          height: style.point.radius * 2,
+          fill: style.point.fillColor,
+          stroke: style.point.borderColor,
+          'stroke-width': style.point.borderWidth,
+          opacity: style.point.opacity,
+        });
+      } else if (style.point.shape === 'triangle') {
+        const r = style.point.radius * 1.35;
+        node = makeSvgElement('polygon', {
+          points: `${point.x},${point.y - r} ${point.x - r},${point.y + r} ${point.x + r},${point.y + r}`,
+          fill: style.point.fillColor,
+          stroke: style.point.borderColor,
+          'stroke-width': style.point.borderWidth,
+          opacity: style.point.opacity,
+        });
+      } else {
+        node = makeSvgElement('circle', {
+          cx: point.x,
+          cy: point.y,
+          r: style.point.radius,
+          fill: style.point.fillColor,
+          stroke: style.point.borderColor,
+          'stroke-width': style.point.borderWidth,
+          opacity: style.point.opacity,
+        });
+      }
+      if (style.point.pulse) node.classList.add('pulse');
+      group.appendChild(node);
+      if (style.label.show) group.appendChild(renderLabel(feature, point, style));
     } else if (feature.feature_type === 'polygon') {
       node = makeSvgElement('polygon', {
         points: points.map((point) => point.x + ',' + point.y).join(' '),
-        fill: color,
-        'fill-opacity': 0.24,
-        stroke: color,
-        'stroke-width': 0.7,
+        fill: style.polygon.fillColor,
+        'fill-opacity': style.polygon.fillOpacity,
+        stroke: style.polygon.borderColor,
+        'stroke-width': style.polygon.borderWidth,
       });
+      group.appendChild(node);
     } else if (feature.feature_type === 'label') {
       const point = points[0] || { x: 50, y: 50 };
-      node = makeSvgElement('text', {
-        x: point.x,
-        y: point.y,
-        fill: color,
-        'font-size': 14,
-        'font-weight': 700,
-      });
-      node.textContent = feature.name;
+      node = renderLabel(feature, point, style);
+      group.appendChild(node);
     } else {
       node = makeSvgElement('polyline', {
         points: points.map((point) => point.x + ',' + point.y).join(' '),
         fill: 'none',
-        stroke: color,
-        'stroke-width': 0.8,
+        stroke: style.line.strokeColor,
+        'stroke-width': style.line.strokeWidth,
+        opacity: style.line.opacity,
       });
+      group.appendChild(node);
     }
-    node.classList.add('feature');
-    if (feature.id === state.selectedId) node.classList.add('selected');
-    node.dataset.featureId = feature.id;
-    node.addEventListener('click', (event) => {
-      event.stopPropagation();
-      setSelected(feature.id);
+    return group;
+  }
+
+  function renderLabel(feature, point, style) {
+    const label = style.label;
+    const text = label.uppercase ? (label.text || feature.name).toUpperCase() : (label.text || feature.name);
+    const fontWeight = label.fontStyle.includes('bold') ? '700' : '400';
+    const fontStyle = label.fontStyle.includes('italic') ? 'italic' : 'normal';
+    const node = makeSvgElement('text', {
+      x: point.x + label.offsetX,
+      y: point.y + label.offsetY,
+      fill: label.fontColor,
+      stroke: label.strokeColor,
+      'stroke-width': label.strokeWidth,
+      'paint-order': 'stroke',
+      'font-size': label.fontSize,
+      'font-family': label.fontFamily,
+      'font-style': fontStyle,
+      'font-weight': fontWeight,
+      'text-anchor': label.textAlign,
     });
+    node.textContent = text;
     return node;
   }
 
@@ -197,13 +401,43 @@
 
   function fillInspector() {
     const feature = selectedFeature();
+    const style = normalizeStyle(feature ? feature.style : {});
+    const firstPoint = feature && feature.geometry && feature.geometry.points ? feature.geometry.points[0] : null;
+    const geo = firstPoint && firstPoint.geo ? firstPoint.geo : null;
     $('feature-id').value = feature ? feature.id : '';
     $('feature-name').value = feature ? feature.name : '';
     $('feature-category').value = feature ? feature.category : '';
     $('feature-force').value = feature ? feature.icse_force : '';
+    $('feature-tags').value = feature && Array.isArray(feature.tags) ? feature.tags.join(', ') : '';
     $('feature-importance').value = feature ? feature.importance_notes : '';
     $('feature-exam').value = feature ? feature.exam_notes : '';
     $('feature-social').value = feature ? feature.social_studies_notes : '';
+    $('marker-shape').value = style.point.shape;
+    $('marker-radius').value = style.point.radius;
+    $('marker-fill').value = style.point.fillColor;
+    $('marker-border').value = style.point.borderColor;
+    $('marker-border-width').value = style.point.borderWidth;
+    $('marker-opacity').value = style.point.opacity;
+    $('marker-pulse').checked = Boolean(style.point.pulse);
+    $('label-show').checked = Boolean(style.label.show);
+    $('label-text').value = style.label.text || (feature ? feature.name : '');
+    $('label-font-family').value = style.label.fontFamily;
+    $('label-font-style').value = style.label.fontStyle;
+    $('label-font-size').value = style.label.fontSize;
+    $('label-font-color').value = style.label.fontColor;
+    $('label-stroke-color').value = style.label.strokeColor;
+    $('label-stroke-width').value = style.label.strokeWidth;
+    $('label-uppercase').checked = Boolean(style.label.uppercase);
+    $('label-offset-x').value = style.label.offsetX;
+    $('label-offset-y').value = style.label.offsetY;
+    $('label-align').value = style.label.textAlign;
+    if (geo) {
+      $('selected-coordinate-panel').textContent = `Lat ${geo.lat}, Lng ${geo.lng}. ${geo.warning || ''}`;
+    } else {
+      $('selected-coordinate-panel').textContent = config.calibrationMode === 'uncalibrated'
+        ? 'Custom map annotation mode. Latitude/longitude unavailable.'
+        : 'No coordinate selected.';
+    }
   }
 
   async function createFeature(point) {
@@ -219,7 +453,7 @@
       feature_type: type,
       category: type === 'point' ? 'city' : '',
       geometry: { points },
-      style: {},
+      style: JSON.parse(JSON.stringify(DEFAULT_STYLE)),
       properties: {},
       tags: [],
     };
@@ -236,12 +470,18 @@
 
   async function updateSelectedFromForm(event) {
     event.preventDefault();
+    await saveSelectedFeatureFromForm();
+  }
+
+  async function saveSelectedFeatureFromForm() {
     const id = $('feature-id').value;
     if (!id) return;
     const payload = {
       name: $('feature-name').value || 'Untitled feature',
       category: $('feature-category').value,
       icse_force: $('feature-force').value,
+      tags: $('feature-tags').value.split(',').map((tag) => tag.trim()).filter(Boolean),
+      style: styleFromControls(),
       importance_notes: $('feature-importance').value,
       exam_notes: $('feature-exam').value,
       social_studies_notes: $('feature-social').value,
@@ -250,6 +490,17 @@
     state.features = state.features.map((feature) => (feature.id === result.feature.id ? result.feature : feature));
     setSelected(result.feature.id);
     debounceSave();
+  }
+
+  function updateLocalStyleFromControls() {
+    const feature = selectedFeature();
+    if (!feature) return;
+    feature.style = styleFromControls();
+    render();
+    window.clearTimeout(styleSaveTimer);
+    styleSaveTimer = window.setTimeout(() => {
+      saveSelectedFeatureFromForm().catch((error) => setStatus(error.message));
+    }, 450);
   }
 
   async function deleteSelected() {
@@ -274,7 +525,13 @@
 
   function handlePointerMove(event) {
     const point = stagePoint(event);
-    $('coordinate-readout').textContent = 'x: ' + point.x + ', y: ' + point.y;
+    let text = 'x: ' + point.x + ', y: ' + point.y;
+    if (point.geo) {
+      text += ' | lat: ' + point.geo.lat + ', lng: ' + point.geo.lng;
+    } else if (config.calibrationMode === 'uncalibrated') {
+      text += ' | annotation mode';
+    }
+    $('coordinate-readout').textContent = text;
     if (state.loupe) {
       const loupe = $('map-loupe');
       loupe.hidden = false;
@@ -370,7 +627,7 @@
       category: featureJson.category || featureJson.force_type || '',
       icse_force: featureJson.force_type || '',
       geometry: featureJson.geometry || { points: [] },
-      style: featureJson.style || {},
+      style: normalizeStyle(featureJson.style || {}),
       properties: {
         geometry_accuracy: featureJson.geometry_accuracy || 'manual_required',
         confidence: featureJson.confidence || 'low',
@@ -398,15 +655,33 @@
 
   function importJson(file) {
     const reader = new FileReader();
-    reader.addEventListener('load', () => {
+    reader.addEventListener('load', async () => {
       try {
         const data = JSON.parse(reader.result);
-        if (Array.isArray(data.features)) {
-          state.features = data.features;
-          render();
-          debounceSave();
-          setStatus('Imported JSON');
+        const importedFeatures = data.features || (data.state && data.state.features) || [];
+        if (!Array.isArray(importedFeatures)) throw new Error('No features array found');
+        const created = [];
+        for (const imported of importedFeatures) {
+          const safeFeature = {
+            name: imported.name || imported.label || 'Imported feature',
+            feature_type: imported.feature_type || imported.type || 'point',
+            category: imported.category || imported.force_type || '',
+            icse_force: imported.icse_force || imported.force_type || '',
+            geometry: imported.geometry || { points: imported.points || [] },
+            style: normalizeStyle(imported.style || {}),
+            properties: imported.properties || {},
+            importance_notes: imported.importance_notes || imported.importance || '',
+            exam_notes: imported.exam_notes || imported.exam_note || '',
+            social_studies_notes: imported.social_studies_notes || imported.social_studies_connection || '',
+            tags: imported.tags || [],
+          };
+          const result = await api.createFeature(safeFeature);
+          created.push(result.feature);
         }
+        state.features = state.features.concat(created);
+        render();
+        debounceSave();
+        setStatus(created.length + ' feature(s) imported');
       } catch (error) {
         setStatus('Import failed');
       }
@@ -443,9 +718,18 @@
     document.querySelector('[data-map-action="delete-feature"]').addEventListener('click', () => {
       deleteSelected().catch((error) => setStatus(error.message));
     });
+    document.querySelector('[data-map-action="report-pdf"]').addEventListener('click', () => {
+      const feature = selectedFeature();
+      if (!feature) return setStatus('Select a feature first');
+      window.location.href = api.featureReportUrl(feature.id);
+    });
     document.querySelector('[data-map-action="calibrate"]').addEventListener('click', () => {
-      state.calibration = { mode: 'four_point', updated_at: new Date().toISOString() };
-      setStatus('Calibration marker saved');
+      state.calibration = {
+        mode: 'four_point_calibrated_future',
+        updated_at: new Date().toISOString(),
+        warning: 'Advanced approximate calibration works best only for proportional maps. Distorted/non-scale images may produce inaccurate coordinates.',
+      };
+      setStatus('Advanced approximate calibration marker saved');
       debounceSave();
     });
     document.querySelector('[data-map-action="loupe"]').addEventListener('click', () => {
@@ -472,6 +756,10 @@
     $('force-filter').addEventListener('change', render);
     $('feature-form').addEventListener('submit', (event) => {
       updateSelectedFromForm(event).catch((error) => setStatus(error.message));
+    });
+    document.querySelectorAll('.style-control').forEach((control) => {
+      control.addEventListener('input', updateLocalStyleFromControls);
+      control.addEventListener('change', updateLocalStyleFromControls);
     });
     $('photo-form').addEventListener('submit', (event) => {
       event.preventDefault();

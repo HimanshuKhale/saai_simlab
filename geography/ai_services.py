@@ -30,7 +30,15 @@ def _feature_label(feature):
 def explain_feature(feature):
     category = feature.category or 'map feature'
     notes = feature.exam_notes or feature.importance_notes or feature.social_studies_notes
+    first_geo = {}
+    for point in (feature.geometry or {}).get('points') or []:
+        if isinstance(point, dict) and point.get('geo'):
+            first_geo = point['geo']
+            break
     explanation = f'{_feature_label(feature)} is marked as a {category}.'
+    warnings = ['Verify map position and facts with textbook/teacher.']
+    if first_geo.get('accuracy') == 'approximate':
+        warnings.append(first_geo.get('warning') or 'Approximate coordinate for learning use.')
     if notes:
         explanation = f'{explanation} Key note: {notes[:240]}'
     return {
@@ -39,18 +47,26 @@ def explain_feature(feature):
         'explanation': explanation,
         'detailed_explanation': explanation,
         'physical_geography': 'Review the location, shape, direction, scale, and nearby physical features.',
+        'political_geography': 'For the India Political Map, connect the feature to states, union territories, capitals, or boundaries where relevant.',
         'human_geography': 'Connect the feature to settlement, transport, resources, or regional planning where relevant.',
         'economic_importance': feature.importance_notes or 'Add economic importance after checking textbook or class notes.',
+        'policy_or_governance_relevance': feature.social_studies_notes or 'Add a governance or civic connection if the feature affects people, administration, or development.',
         'historical_or_civics_connection': feature.social_studies_notes or 'Add a social studies connection if the feature affects people, governance, or development.',
+        'icse_exam_note': feature.exam_notes or 'Write a concise ICSE Class X map-marking note for revision.',
         'exam_note': feature.exam_notes or 'Write a concise ICSE-style note for revision.',
+        'map_marking_relevance': 'Use clear symbols, compact labels, and avoid covering neighboring map detail.',
+        'forces_or_attributes': [item for item in [feature.icse_force, feature.category] if item],
         'common_mistakes': ['Do not treat approximate placement as exact.', 'Check spelling and map orientation.'],
         'related_features_to_add': [],
+        'possible_questions': generate_feature_questions(feature)['questions'],
         'questions': generate_feature_questions(feature)['questions'],
         'confidence': 'low',
+        'warnings': warnings,
         'map_skill_tip': 'Check placement, scale, direction, and nearby related features before finalising the mark.',
         **source_metadata(
             project_feature_data=True,
             student_notes=bool(notes),
+            sources_used=['Saved SAAI map feature data'],
             uncertainty='Fallback explanation based only on saved map data and notes.',
         ),
     }
