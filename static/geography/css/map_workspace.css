@@ -157,6 +157,47 @@
   white-space: pre-wrap;
 }
 
+.ai-transparency {
+  background: #fff8e1;
+  border: 1px solid #f1d37a;
+  border-radius: 8px;
+  color: #5f4b13;
+  font-size: 0.78rem;
+  min-height: 80px;
+  padding: 0.65rem;
+  white-space: pre-wrap;
+}
+
+.chat-messages {
+  background: #f7f8fb;
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 220px;
+  min-height: 90px;
+  overflow: auto;
+  padding: 0.65rem;
+}
+
+.chat-message {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.chat-message strong {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.ai-json-preview {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-height: 190px;
+}
+
 @media (max-width: 1100px) {
   .map-workspace {
     grid-template-columns: 1fr;

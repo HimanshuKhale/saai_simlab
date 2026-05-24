@@ -64,5 +64,42 @@
         body: JSON.stringify(note),
       });
     },
+    generateFeatureJson(payload) {
+      return request(window.SAAI_MAP_CONFIG.apiUrls.generateFeatureJson, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+    publicContext(id) {
+      return request(apiUrl(window.SAAI_MAP_CONFIG.apiUrls.publicContextTemplate, id), {
+        method: 'GET',
+      });
+    },
+    startChat(id, scope) {
+      return request(apiUrl(window.SAAI_MAP_CONFIG.apiUrls.startChatTemplate, id), {
+        method: 'POST',
+        body: JSON.stringify({ scope: scope || 'feature' }),
+      });
+    },
+    chatMessages(id) {
+      return request(apiUrl(window.SAAI_MAP_CONFIG.apiUrls.chatMessagesTemplate, id), {
+        method: 'GET',
+      });
+    },
+    sendChat(id, message) {
+      return request(apiUrl(window.SAAI_MAP_CONFIG.apiUrls.chatSendTemplate, id), {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+    },
+    studyNotes(id) {
+      return request(apiUrl(window.SAAI_MAP_CONFIG.apiUrls.chatStudyNotesTemplate, id), {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    },
+    chatExportUrl(id) {
+      return apiUrl(window.SAAI_MAP_CONFIG.apiUrls.chatExportTemplate, id);
+    },
   };
 })();

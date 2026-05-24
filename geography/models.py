@@ -214,6 +214,10 @@ class GeographyAIInteraction(models.Model):
     class Action(models.TextChoices):
         EXPLAIN_FEATURE = 'explain_feature', 'Explain feature'
         GENERATE_QUESTIONS = 'generate_questions', 'Generate questions'
+        GENERATE_FEATURE_JSON = 'generate_feature_json', 'Generate feature JSON'
+        CHAT = 'chat', 'Chat'
+        STUDY_NOTES = 'study_notes', 'Study notes'
+        PUBLIC_CONTEXT = 'public_context', 'Public context'
         CHECK_PROJECT = 'check_project', 'Check project'
         REVISION_SHEET = 'revision_sheet', 'Revision sheet'
 
@@ -241,6 +245,106 @@ class GeographyAIInteraction(models.Model):
 
     def __str__(self):
         return f'{self.get_action_display()} for {self.project}'
+
+
+class GeographyChatSession(models.Model):
+    class Scope(models.TextChoices):
+        FEATURE = 'feature', 'Feature'
+        PROJECT = 'project', 'Project'
+        GENERAL = 'general', 'General'
+
+    project = models.ForeignKey(MapProject, on_delete=models.CASCADE, related_name='chat_sessions')
+    feature = models.ForeignKey(
+        MapFeature,
+        on_delete=models.SET_NULL,
+        related_name='chat_sessions',
+        blank=True,
+        null=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='geography_chat_sessions',
+    )
+    title = models.CharField(max_length=180, blank=True)
+    scope = models.CharField(max_length=20, choices=Scope.choices, default=Scope.FEATURE)
+    context_snapshot = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.title or 'Geography AI Chat'
+
+    def save(self, *args, **kwargs):
+        if not self.title:
+            if self.scope == self.Scope.FEATURE and self.feature_id:
+                self.title = f'Chat: {self.feature.name}'
+            elif self.scope == self.Scope.PROJECT:
+                self.title = f'Project Chat: {self.project.title}'
+            else:
+                self.title = 'Geography AI Chat'
+        super().save(*args, **kwargs)
+
+
+class GeographyChatMessage(models.Model):
+    class Role(models.TextChoices):
+        USER = 'user', 'User'
+        ASSISTANT = 'assistant', 'Assistant'
+        SYSTEM = 'system', 'System'
+        TOOL = 'tool', 'Tool'
+
+    chat_session = models.ForeignKey(
+        GeographyChatSession,
+        on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    role = models.CharField(max_length=20, choices=Role.choices)
+    content = models.TextField()
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f'{self.get_role_display()} message in {self.chat_session}'
+
+
+class GeographyStudyNote(models.Model):
+    chat_session = models.ForeignKey(
+        GeographyChatSession,
+        on_delete=models.SET_NULL,
+        related_name='study_notes',
+        blank=True,
+        null=True,
+    )
+    project = models.ForeignKey(MapProject, on_delete=models.CASCADE, related_name='study_notes')
+    feature = models.ForeignKey(
+        MapFeature,
+        on_delete=models.SET_NULL,
+        related_name='study_notes',
+        blank=True,
+        null=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='geography_study_notes',
+    )
+    title = models.CharField(max_length=180)
+    notes_text = models.TextField()
+    notes_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.title
 
 
 class MapSubmission(models.Model):

@@ -22,6 +22,21 @@ urlpatterns = [
         views.ai_generate_feature_questions,
         name='api_ai_generate_feature_questions',
     ),
+    path(
+        'api/projects/<int:project_id>/ai/generate-feature-json/',
+        views.ai_generate_feature_json,
+        name='api_generate_feature_json',
+    ),
+    path(
+        'api/features/<int:feature_id>/public-context/',
+        views.public_feature_context,
+        name='api_public_feature_context',
+    ),
+    path('api/features/<int:feature_id>/chat/start/', views.chat_start, name='api_chat_start'),
+    path('api/chats/<int:chat_id>/send/', views.chat_send, name='api_chat_send'),
+    path('api/chats/<int:chat_id>/messages/', views.chat_messages, name='api_chat_messages'),
+    path('api/chats/<int:chat_id>/export-txt/', views.chat_export_txt, name='api_chat_export_txt'),
+    path('api/chats/<int:chat_id>/study-notes/', views.chat_study_notes, name='api_chat_study_notes'),
     path('api/projects/<int:project_id>/ai/check/', views.ai_check_project, name='api_ai_check_project'),
     path(
         'api/projects/<int:project_id>/ai/revision-sheet/',

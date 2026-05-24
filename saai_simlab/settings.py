@@ -10,7 +10,16 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -129,6 +138,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-5.5')
+OPENAI_FALLBACK_MODEL = os.getenv('OPENAI_FALLBACK_MODEL', '')
+GEOGRAPHY_AI_ENABLED = os.getenv('GEOGRAPHY_AI_ENABLED', '1') == '1'
+GEOGRAPHY_EXTERNAL_DATA_ENABLED = os.getenv('GEOGRAPHY_EXTERNAL_DATA_ENABLED', '1') == '1'
+GEOGRAPHY_OPENAI_WEB_SEARCH_ENABLED = os.getenv('GEOGRAPHY_OPENAI_WEB_SEARCH_ENABLED', '0') == '1'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

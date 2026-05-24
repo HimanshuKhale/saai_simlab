@@ -132,10 +132,47 @@
         <div class="d-grid gap-2">
           <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="explain">Explain selected feature</button>
           <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="questions">Generate questions</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="public-context">Get public geography context</button>
           <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="check">Check full map</button>
           <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="revision">Create revision sheet</button>
         </div>
         <pre id="ai-output" class="ai-output mt-2"></pre>
+        <pre id="ai-transparency" class="ai-transparency mt-2">AI explanations are study assistance. Verify with textbook/teacher.</pre>
+
+        <hr>
+        <h2 class="h6">Feature chat</h2>
+        <div id="chat-messages" class="chat-messages"></div>
+        <textarea class="form-control form-control-sm mt-2" id="chat-input" rows="2" maxlength="3000" placeholder="Ask about the selected feature"></textarea>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-chat-action="start">Start chat</button>
+          <button class="btn btn-sm btn-primary" type="button" data-chat-action="send">Send</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-chat-action="export">Export TXT</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-chat-action="study-notes">Study notes</button>
+        </div>
+
+        <hr>
+        <h2 class="h6">Generate feature from AI</h2>
+        <label class="form-label" for="ai-feature-type">Feature type</label>
+        <select class="form-select form-select-sm mb-2" id="ai-feature-type">
+          <option value="point">Point</option>
+          <option value="line">Line</option>
+          <option value="polygon">Polygon</option>
+          <option value="label">Label</option>
+        </select>
+        <label class="form-label" for="ai-feature-name">Feature name</label>
+        <input class="form-control form-control-sm mb-2" id="ai-feature-name" placeholder="Ganga River">
+        <label class="form-label" for="ai-feature-force">Force/category</label>
+        <input class="form-control form-control-sm mb-2" id="ai-feature-force" placeholder="rivers_water">
+        <label class="form-label" for="ai-feature-description">Prompt</label>
+        <textarea class="form-control form-control-sm mb-2" id="ai-feature-description" rows="3" maxlength="4000"></textarea>
+        <label class="form-label" for="ai-feature-style">Style preference JSON</label>
+        <textarea class="form-control form-control-sm mb-2" id="ai-feature-style" rows="2" placeholder='{"color":"#1c7ed6"}'></textarea>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-generate-action="generate">Generate JSON</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-generate-action="copy">Copy JSON</button>
+          <button class="btn btn-sm btn-primary" type="button" data-generate-action="import">Import to map</button>
+        </div>
+        <textarea class="form-control form-control-sm ai-json-preview" id="ai-feature-json" rows="8" readonly></textarea>
       </aside>
     </div>
   </div>

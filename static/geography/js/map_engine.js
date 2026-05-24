@@ -11,6 +11,8 @@
     loupe: false,
     zoom: 1,
     pan: { x: 0, y: 0 },
+    currentChatId: null,
+    generatedFeatureJson: null,
   };
 
   const elements = {};
@@ -59,6 +61,11 @@
     $('save-status').textContent = message;
   }
 
+  function renderAiResult(result) {
+    $('ai-output').textContent = JSON.stringify(result, null, 2);
+    window.SAAIAIPanel.renderTransparency($('ai-transparency'), result);
+  }
+
   function debounceSave() {
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(saveProject, 800);
@@ -79,6 +86,10 @@
   }
 
   function setSelected(featureId) {
+    if (state.selectedId !== featureId) {
+      state.currentChatId = null;
+      if ($('chat-messages')) $('chat-messages').innerHTML = '';
+    }
     state.selectedId = featureId;
     fillInspector();
     render();
@@ -287,6 +298,98 @@
     window.open(url, '_blank', 'noopener');
   }
 
+  function renderChat(messages) {
+    const wrap = $('chat-messages');
+    wrap.innerHTML = '';
+    messages.forEach((message) => {
+      const item = document.createElement('div');
+      item.className = 'chat-message';
+      const role = document.createElement('strong');
+      role.textContent = message.role === 'assistant' ? 'AI' : message.role;
+      const content = document.createElement('div');
+      content.textContent = message.content;
+      item.appendChild(role);
+      item.appendChild(content);
+      wrap.appendChild(item);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  async function ensureChat() {
+    if (state.currentChatId) return state.currentChatId;
+    if (!state.selectedId) throw new Error('Select a feature first.');
+    const result = await api.startChat(state.selectedId, 'feature');
+    state.currentChatId = result.chat_session_id;
+    renderChat([]);
+    return state.currentChatId;
+  }
+
+  async function sendChat() {
+    const chatId = await ensureChat();
+    const input = $('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+    const result = await api.sendChat(chatId, message);
+    input.value = '';
+    const messages = await api.chatMessages(chatId);
+    renderChat(messages.messages);
+    window.SAAIAIPanel.renderTransparency($('ai-transparency'), result.payload || {});
+  }
+
+  function parseStylePreference() {
+    const raw = $('ai-feature-style').value.trim();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      setStatus('Style JSON is invalid; ignoring style preference');
+      return {};
+    }
+  }
+
+  async function generateFeatureJson() {
+    const result = await api.generateFeatureJson({
+      feature_type: $('ai-feature-type').value,
+      name: $('ai-feature-name').value,
+      force_type: $('ai-feature-force').value,
+      description: $('ai-feature-description').value,
+      style_preferences: parseStylePreference(),
+    });
+    state.generatedFeatureJson = result.feature_json;
+    $('ai-feature-json').value = JSON.stringify(result.feature_json, null, 2);
+    renderAiResult(result);
+  }
+
+  async function importGeneratedFeature() {
+    const raw = $('ai-feature-json').value.trim();
+    if (!raw) throw new Error('Generate or paste feature JSON first.');
+    const featureJson = JSON.parse(raw);
+    const feature = {
+      name: featureJson.name || 'AI draft feature',
+      feature_type: featureJson.feature_type || 'point',
+      category: featureJson.category || featureJson.force_type || '',
+      icse_force: featureJson.force_type || '',
+      geometry: featureJson.geometry || { points: [] },
+      style: featureJson.style || {},
+      properties: {
+        geometry_accuracy: featureJson.geometry_accuracy || 'manual_required',
+        confidence: featureJson.confidence || 'low',
+        warnings: featureJson.warnings || [],
+        ai_summary: featureJson.ai_summary || '',
+        ai_questions: featureJson.ai_questions || [],
+      },
+      importance_notes: featureJson.importance || '',
+      exam_notes: featureJson.exam_note || '',
+      social_studies_notes: featureJson.social_studies_connection || '',
+      tags: featureJson.tags || [],
+    };
+    const result = await api.createFeature(feature);
+    state.features.push(result.feature);
+    setSelected(result.feature.id);
+    debounceSave();
+    setStatus(feature.geometry.points && feature.geometry.points.length ? 'AI feature imported' : 'AI draft imported; place geometry manually');
+  }
+
   function applyTransform() {
     const transform = 'translate(' + state.pan.x + 'px, ' + state.pan.y + 'px) scale(' + state.zoom + ')';
     elements.image.style.transform = transform;
@@ -398,12 +501,49 @@
       button.addEventListener('click', () => {
         window.SAAIAIPanel.run(button.dataset.aiAction, state.selectedId)
           .then((result) => {
-            $('ai-output').textContent = JSON.stringify(result, null, 2);
+            renderAiResult(result);
           })
           .catch((error) => {
             $('ai-output').textContent = error.message;
           });
       });
+    });
+    document.querySelector('[data-chat-action="start"]').addEventListener('click', () => {
+      ensureChat()
+        .then((chatId) => api.chatMessages(chatId))
+        .then((result) => {
+          renderChat(result.messages);
+          setStatus('Chat ready');
+        })
+        .catch((error) => setStatus(error.message));
+    });
+    document.querySelector('[data-chat-action="send"]').addEventListener('click', () => {
+      sendChat().catch((error) => setStatus(error.message));
+    });
+    document.querySelector('[data-chat-action="export"]').addEventListener('click', () => {
+      ensureChat()
+        .then((chatId) => {
+          window.location.href = api.chatExportUrl(chatId);
+        })
+        .catch((error) => setStatus(error.message));
+    });
+    document.querySelector('[data-chat-action="study-notes"]').addEventListener('click', () => {
+      ensureChat()
+        .then((chatId) => api.studyNotes(chatId))
+        .then((result) => {
+          renderAiResult(result);
+          setStatus('Study notes created');
+        })
+        .catch((error) => setStatus(error.message));
+    });
+    document.querySelector('[data-generate-action="generate"]').addEventListener('click', () => {
+      generateFeatureJson().catch((error) => setStatus(error.message));
+    });
+    document.querySelector('[data-generate-action="copy"]').addEventListener('click', () => {
+      navigator.clipboard.writeText($('ai-feature-json').value || '').then(() => setStatus('Feature JSON copied'));
+    });
+    document.querySelector('[data-generate-action="import"]').addEventListener('click', () => {
+      importGeneratedFeature().catch((error) => setStatus(error.message));
     });
     window.addEventListener('keydown', (event) => {
       if (event.ctrlKey && event.key.toLowerCase() === 's') {

@@ -2,6 +2,9 @@ from django.contrib import admin
 
 from .models import (
     GeographyAIInteraction,
+    GeographyChatMessage,
+    GeographyChatSession,
+    GeographyStudyNote,
     GeographyTask,
     MapAsset,
     MapFeature,
@@ -75,6 +78,37 @@ class GeographyAIInteractionAdmin(admin.ModelAdmin):
     list_display = ('action', 'project', 'feature', 'user', 'created_at')
     list_filter = ('action', 'created_at')
     search_fields = ('project__title', 'feature__name', 'user__username')
+
+
+class GeographyChatMessageInline(admin.TabularInline):
+    model = GeographyChatMessage
+    extra = 0
+    readonly_fields = ('created_at',)
+
+
+@admin.register(GeographyChatSession)
+class GeographyChatSessionAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'feature', 'user', 'scope', 'updated_at')
+    list_filter = ('scope', 'created_at', 'updated_at')
+    search_fields = ('title', 'project__title', 'feature__name', 'user__username')
+    readonly_fields = ('created_at', 'updated_at')
+    inlines = [GeographyChatMessageInline]
+
+
+@admin.register(GeographyChatMessage)
+class GeographyChatMessageAdmin(admin.ModelAdmin):
+    list_display = ('chat_session', 'role', 'created_at')
+    list_filter = ('role', 'created_at')
+    search_fields = ('chat_session__title', 'content')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(GeographyStudyNote)
+class GeographyStudyNoteAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'feature', 'user', 'updated_at')
+    list_filter = ('created_at', 'updated_at')
+    search_fields = ('title', 'project__title', 'feature__name', 'user__username', 'notes_text')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(MapSubmission)

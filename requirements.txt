@@ -3,3 +3,6 @@ Django==6.0.5
 Pillow==11.2.1
 sqlparse==0.5.5
 tzdata==2026.2
+openai
+python-dotenv
+requests

@@ -32,7 +32,24 @@
       if (action === 'revision') {
         return post(urls.revisionSheet);
       }
+      if (action === 'public-context') {
+        if (!featureId) throw new Error('Select a feature first.');
+        return window.SAAIMapAPI.publicContext(featureId);
+      }
       throw new Error('Unknown AI action.');
+    },
+    renderTransparency(target, payload) {
+      if (!target) return;
+      const data = payload.explanation || payload.feature_json || payload.revision_sheet || payload.study_note || payload;
+      const basis = data.source_basis || {};
+      const warnings = data.warnings || [];
+      target.textContent = [
+        data.confidence ? 'Confidence: ' + data.confidence : '',
+        warnings.length ? 'Warnings: ' + warnings.join('; ') : '',
+        basis ? 'Sources: ' + JSON.stringify(basis) : '',
+        data.uncertainty ? 'Uncertainty: ' + data.uncertainty : '',
+        data.student_warning || 'AI explanations are study assistance. Verify with textbook/teacher.',
+      ].filter(Boolean).join('\n');
     },
   };
 })();
