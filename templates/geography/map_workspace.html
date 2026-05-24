@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ project.title }} | Geography Map Lab{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'geography/css/map_workspace.css' %}">
+{% endblock %}
+
+{% block content %}
+  {{ map_config|json_script:"saai-map-config" }}
+  <script>
+    window.SAAI_MAP_CONFIG = JSON.parse(document.getElementById('saai-map-config').textContent);
+  </script>
+
+  <div class="map-shell" data-project-id="{{ project.id }}">
+    <header class="map-topbar">
+      <div>
+        <p class="text-uppercase text-secondary small mb-1">Geography Map Lab</p>
+        <h1 class="h4 mb-0">{{ project.title }}</h1>
+      </div>
+      <div class="map-actions">
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'geography:project_detail' project.id %}">Review</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'geography:project_list' %}">Projects</a>
+        <button class="btn btn-sm btn-primary" type="button" data-map-action="save">Save</button>
+      </div>
+    </header>
+
+    <div class="map-workspace">
+      <aside class="map-sidebar">
+        <div class="tool-grid" aria-label="Map tools">
+          <button type="button" data-tool="select" class="active">Select</button>
+          <button type="button" data-tool="point">Point</button>
+          <button type="button" data-tool="line">Line</button>
+          <button type="button" data-tool="polygon">Polygon</button>
+          <button type="button" data-tool="label">Label</button>
+          <button type="button" data-tool="measure">Measure</button>
+          <button type="button" data-map-action="calibrate">Calibrate</button>
+          <button type="button" data-map-action="loupe">Loupe</button>
+          <button type="button" data-map-action="zoom-in">Zoom +</button>
+          <button type="button" data-map-action="zoom-out">Zoom -</button>
+          <button type="button" data-map-action="export-json">Export</button>
+          <button type="button" data-map-action="import-json">Import</button>
+        </div>
+        <input type="file" id="json-import" accept="application/json" hidden>
+
+        <div class="mt-3">
+          <label class="form-label" for="feature-filter">Category filter</label>
+          <select class="form-select form-select-sm" id="feature-filter">
+            <option value="">All categories</option>
+            <option value="city">City</option>
+            <option value="river">River</option>
+            <option value="road">Road</option>
+            <option value="railway">Railway</option>
+            <option value="region">Region</option>
+          </select>
+        </div>
+
+        <div class="mt-3">
+          <label class="form-label" for="force-filter">ICSE force filter</label>
+          <select class="form-select form-select-sm" id="force-filter">
+            <option value="">All</option>
+            <option value="physical">Physical</option>
+            <option value="political">Political</option>
+            <option value="transport">Transport</option>
+            <option value="settlement">Settlement</option>
+          </select>
+        </div>
+
+        <div class="mt-3">
+          <h2 class="h6">Saved features</h2>
+          <div id="feature-list" class="feature-list"></div>
+        </div>
+      </aside>
+
+      <section class="map-stage-wrap">
+        <div class="map-stage" id="map-stage">
+          <div class="map-placeholder" id="map-placeholder">No map image selected</div>
+          <img id="map-image" class="map-image" alt="{{ project.title }}">
+          <svg id="map-overlay" class="map-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="map-loupe" class="map-loupe" hidden></div>
+        </div>
+        <footer class="map-readouts">
+          <span id="coordinate-readout">x: 0, y: 0</span>
+          <span id="measurement-readout">Measure: 0 px</span>
+          <span id="save-status">Ready</span>
+        </footer>
+      </section>
+
+      <aside class="map-inspector">
+        <h2 class="h6">Feature properties</h2>
+        <form id="feature-form">
+          <input type="hidden" id="feature-id">
+          <label class="form-label" for="feature-name">Name</label>
+          <input class="form-control form-control-sm mb-2" id="feature-name">
+          <label class="form-label" for="feature-category">Category</label>
+          <input class="form-control form-control-sm mb-2" id="feature-category">
+          <label class="form-label" for="feature-force">ICSE force</label>
+          <input class="form-control form-control-sm mb-2" id="feature-force">
+          <label class="form-label" for="feature-importance">Importance notes</label>
+          <textarea class="form-control form-control-sm mb-2" id="feature-importance" rows="2"></textarea>
+          <label class="form-label" for="feature-exam">Exam notes</label>
+          <textarea class="form-control form-control-sm mb-2" id="feature-exam" rows="2"></textarea>
+          <label class="form-label" for="feature-social">Social studies connection</label>
+          <textarea class="form-control form-control-sm mb-2" id="feature-social" rows="2"></textarea>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" type="submit">Update</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" data-map-action="delete-feature">Delete</button>
+          </div>
+        </form>
+
+        <hr>
+        <h2 class="h6">Photos and notes</h2>
+        <form id="photo-form" class="mb-2">
+          <input class="form-control form-control-sm mb-2" type="file" id="photo-image" accept="image/*">
+          <input class="form-control form-control-sm mb-2" id="photo-caption" placeholder="Caption">
+          <button class="btn btn-sm btn-outline-primary" type="submit">Upload photo</button>
+        </form>
+        <form id="note-form">
+          <select class="form-select form-select-sm mb-2" id="note-type">
+            <option value="general">General</option>
+            <option value="importance">Importance</option>
+            <option value="exam">Exam</option>
+            <option value="social_studies">Social studies</option>
+          </select>
+          <textarea class="form-control form-control-sm mb-2" id="note-body" rows="2" placeholder="Add note"></textarea>
+          <button class="btn btn-sm btn-outline-primary" type="submit">Add note</button>
+        </form>
+
+        <hr>
+        <h2 class="h6">AI tutor</h2>
+        <div class="d-grid gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="explain">Explain selected feature</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="questions">Generate questions</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="check">Check full map</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-action="revision">Create revision sheet</button>
+        </div>
+        <pre id="ai-output" class="ai-output mt-2"></pre>
+      </aside>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'geography/js/map_api.js' %}"></script>
+  <script src="{% static 'geography/js/upload_manager.js' %}"></script>
+  <script src="{% static 'geography/js/ai_panel.js' %}"></script>
+  <script src="{% static 'geography/js/map_engine.js' %}"></script>
+{% endblock %}

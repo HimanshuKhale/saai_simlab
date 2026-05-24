@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}My Map Projects | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <nav class="mb-3">
+    <a href="{% url 'geography:dashboard' %}" class="text-decoration-none">Geography Map Lab</a>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h2 mb-1">My map projects</h1>
+      <p class="text-secondary mb-0">Saved map marking workspaces.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'geography:project_create' %}">Create project</a>
+  </div>
+
+  <div class="list-group shadow-sm">
+    {% for project in projects %}
+      <div class="list-group-item p-3">
+        <div class="d-flex flex-wrap justify-content-between gap-3">
+          <div>
+            <h2 class="h5 mb-1">{{ project.title }}</h2>
+            <p class="text-secondary mb-1">{{ project.description|default:"No description yet." }}</p>
+            <small class="text-secondary">Updated {{ project.updated_at }}</small>
+          </div>
+          <div class="d-flex gap-2 align-items-start">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'geography:project_detail' project.id %}">Review</a>
+            <a class="btn btn-sm btn-primary" href="{% url 'geography:workspace' project.id %}">Open</a>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="list-group-item p-3 text-secondary">No map projects yet.</div>
+    {% endfor %}
+  </div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Geography Map Lab | SAAI SimLab{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <p class="text-uppercase text-secondary small mb-1">Geography Map Lab</p>
+      <h1 class="h2 mb-2">Map projects</h1>
+      <p class="text-secondary mb-0">Create, resume, and review saved map marking work.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'geography:project_create' %}">Create project</a>
+  </div>
+
+  <div class="row g-4">
+    <section class="col-lg-7">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Recent projects</h2>
+        <a class="small" href="{% url 'geography:project_list' %}">View all</a>
+      </div>
+      <div class="list-group shadow-sm">
+        {% for project in recent_projects %}
+          <a class="list-group-item list-group-item-action p-3" href="{% url 'geography:workspace' project.id %}">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <strong>{{ project.title }}</strong>
+                <p class="text-secondary mb-0">{{ project.description|default:"No description yet." }}</p>
+              </div>
+              <span class="badge text-bg-light align-self-start">{{ project.get_status_display }}</span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="list-group-item p-3 text-secondary">No map projects yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="col-lg-5">
+      <h2 class="h5 mb-2">Map assets</h2>
+      <div class="list-group shadow-sm">
+        {% for asset in map_assets %}
+          <a class="list-group-item list-group-item-action p-3" href="{% url 'geography:project_create' %}?asset={{ asset.id }}">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <strong>{{ asset.title }}</strong>
+                <p class="text-secondary mb-0">{{ asset.description|default:"Practice map asset." }}</p>
+              </div>
+              <span class="badge text-bg-light align-self-start">{{ asset.get_asset_type_display }}</span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="list-group-item p-3 text-secondary">No published map assets yet. You can upload a custom map while creating a project.</div>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}

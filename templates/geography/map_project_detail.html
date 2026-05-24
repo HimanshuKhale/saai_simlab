@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Review {{ project.title }} | Geography Map Lab{% endblock %}
+
+{% block content %}
+  <nav class="mb-3">
+    <a href="{% url 'geography:project_list' %}" class="text-decoration-none">My map projects</a>
+  </nav>
+
+  <div class="d-flex flex-wrap justify-content-between gap-3 mb-4">
+    <div>
+      <p class="text-uppercase text-secondary small mb-1">Project review</p>
+      <h1 class="h2 mb-1">{{ project.title }}</h1>
+      <p class="text-secondary mb-0">{{ project.description|default:"No description yet." }}</p>
+    </div>
+    {% if project.owner == user %}
+      <a class="btn btn-primary align-self-start" href="{% url 'geography:workspace' project.id %}">Open workspace</a>
+    {% endif %}
+  </div>
+
+  <div class="row g-4">
+    <section class="col-lg-8">
+      <h2 class="h5">Features</h2>
+      <div class="list-group shadow-sm">
+        {% for feature in features %}
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <strong>{{ feature.name }}</strong>
+                <p class="text-secondary mb-2">{{ feature.category|default:feature.get_feature_type_display }}</p>
+              </div>
+              <span class="badge text-bg-light align-self-start">{{ feature.get_feature_type_display }}</span>
+            </div>
+            {% if feature.importance_notes %}<p class="mb-1"><strong>Importance:</strong> {{ feature.importance_notes }}</p>{% endif %}
+            {% if feature.exam_notes %}<p class="mb-1"><strong>Exam:</strong> {{ feature.exam_notes }}</p>{% endif %}
+            {% if feature.social_studies_notes %}<p class="mb-1"><strong>Connection:</strong> {{ feature.social_studies_notes }}</p>{% endif %}
+            <small class="text-secondary">{{ feature.photos.count }} photo(s), {{ feature.notes.count }} note(s)</small>
+          </div>
+        {% empty %}
+          <div class="list-group-item p-3 text-secondary">No features saved yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="col-lg-4">
+      <div class="side-panel mb-4">
+        <h2 class="h5">Project details</h2>
+        <dl class="row mb-0">
+          <dt class="col-5">Owner</dt>
+          <dd class="col-7">{{ project.owner }}</dd>
+          <dt class="col-5">Status</dt>
+          <dd class="col-7">{{ project.get_status_display }}</dd>
+          <dt class="col-5">Updated</dt>
+          <dd class="col-7">{{ project.updated_at }}</dd>
+          <dt class="col-5">Map asset</dt>
+          <dd class="col-7">{{ project.map_asset|default:"Custom or none" }}</dd>
+        </dl>
+      </div>
+
+      <h2 class="h5">AI history</h2>
+      <div class="list-group shadow-sm">
+        {% for interaction in interactions %}
+          <div class="list-group-item">
+            <strong>{{ interaction.get_action_display }}</strong>
+            <div class="text-secondary small">{{ interaction.created_at }}</div>
+          </div>
+        {% empty %}
+          <div class="list-group-item text-secondary">No AI interactions yet.</div>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}
